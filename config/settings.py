@@ -1,16 +1,16 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
-from pathlib import Path
 import os
+from pydantic import BaseModel
+from dotenv import load_dotenv
 
+load_dotenv()
 
-@dataclass
-class Settings:
-    project_root: Path = Path(__file__).resolve().parent.parent
-    app_name: str = "langchain_rag_agent"
-    environment: str = os.getenv("ENVIRONMENT", "development")
-    log_level: str = os.getenv("LOG_LEVEL", "INFO")
+class Settings(BaseModel):
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    QDRANT_URL: str = os.getenv("QDRANT_URL", "http://localhost:6333")
+    QDRANT_API_KEY: str = os.getenv("QDRANT_API_KEY", "")
+    MODEL_NAME: str = os.getenv("MODEL_NAME", "gpt-4o-mini")
+    EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
-
-settings = Settings()
+def get_settings() -> Settings:
+    return Settings()
