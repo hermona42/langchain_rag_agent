@@ -1,6 +1,54 @@
-"""Vector store helpers."""
+from typing import List
+from langchain_core.documents import Document
+from langchain_openai import OpenAIEmbeddings
+from langchain_qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
+from qdrant_client.http.models import Distance, VectorParams
 
+from config.settings import get_settings
+from src.utils.logger import get_logger
 
-def create_vector_store():
-    """Return a placeholder vector store object."""
-    return {"status": "not_implemented"}
+logger = get_logger(__name__)
+
+class QdrantRAGStore:
+    def __init__(self, collection_name: str = "knowledge_base", in_memory: bool = False):
+        self.settings = get_settings()
+        self.collection_name = collection_name
+        self.embeddings = OpenAIEmbeddings(
+            model=self.settings.EMBEDDING_MODEL,
+            openai_api_key=self.settings.OPENAI_API_KEY or "dummy-key-for-tests"
+        )
+
+        if in_memory:
+            self.client = QdrantClient(":memory:")
+        else:
+            if self.settings.QDRANT_API_KEY:
+                self.client = QdrantClient(url=self.settings.QDRANT_URL, api_key=self.settings.QDRANT_API_KEY)
+            else:
+                self.client = QdrantClient(url=self.settings.QDRANT_URL)
+
+        # Create collection if it doesn't exist
+        collections = [c.name for c in self.client.get_collections().collections]
+        if self.collection_name not in collections:
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
+            )
+            logger.info("Created new Qdrant collection", collection=self.collection_name)
+
+        self.vector_store = QdrantVectorStore(
+            client=self.client,
+            collection_name=self.collection_name,
+            embedding=self.embeddings,
+        )
+
+    def add_documents(self, documents: List[Document]) -> List[str]:
+        logger.info("Adding documents to vector store", count=len(documents))
+        return self.vector_store.add_documents(documents)
+
+    def similarity_search(self, query: str, k: int = 3) -> List[Document]:
+        logger.info("Executing similarity search", query=query, k=k)
+        return self.vector_store.similarity_search(query=query, k=k)
+
+    def as_retriever(self, k: int = 3):
+        return self.vector_store.as_retriever(search_kwargs={"k": k})
