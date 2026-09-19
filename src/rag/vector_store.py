@@ -1,6 +1,6 @@
 from typing import List
 from langchain_core.documents import Document
-from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import FakeEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams
@@ -14,10 +14,19 @@ class QdrantRAGStore:
     def __init__(self, collection_name: str = "knowledge_base", in_memory: bool = False):
         self.settings = get_settings()
         self.collection_name = collection_name
-        self.embeddings = OpenAIEmbeddings(
-            model=self.settings.EMBEDDING_MODEL,
-            openai_api_key=self.settings.OPENAI_API_KEY or "dummy-key-for-tests"
-        )
+        
+        api_key = self.settings.OPENAI_API_KEY.strip()
+        
+        # Use FakeEmbeddings if API key is missing or dummy for offline execution
+        if not api_key or api_key.startswith("dummy") or api_key == "your_openai_api_key_here":
+            logger.info("Using FakeEmbeddings for zero-cost offline vector indexing")
+            self.embeddings = FakeEmbeddings(size=1536)
+        else:
+            from langchain_openai import OpenAIEmbeddings
+            self.embeddings = OpenAIEmbeddings(
+                model=self.settings.EMBEDDING_MODEL,
+                openai_api_key=api_key
+            )
 
         if in_memory:
             self.client = QdrantClient(":memory:")
@@ -27,9 +36,8 @@ class QdrantRAGStore:
             else:
                 self.client = QdrantClient(url=self.settings.QDRANT_URL)
 
-        # Create collection if it doesn't exist
-        collections = [c.name for c in self.client.get_collections().collections]
-        if self.collection_name not in collections:
+        # Create collection if missing
+        if not self.client.collection_exists(self.collection_name):
             self.client.create_collection(
                 collection_name=self.collection_name,
                 vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
