@@ -1,10 +1,10 @@
 from unittest.mock import MagicMock, patch
 from langchain_core.documents import Document
-from src.rag.retriever import format_citation_docs
+from src.rag.retriever import format_docs_with_citations
 from src.rag.vector_store import QdrantRAGStore
 
 
-def test_format_citation_docs():
+def test_format_docs_with_citations():
     docs = [
         Document(
             page_content="Response time is 2 hours.",
@@ -16,11 +16,13 @@ def test_format_citation_docs():
         ),
     ]
 
-    formatted = format_citation_docs(docs)
+    formatted = format_docs_with_citations(docs)
 
-    assert "[Source: sla.pdf | Page: 1]" in formatted
+    assert "Source: sla.pdf" in formatted
+    assert "Page: 1" in formatted
     assert "Response time is 2 hours." in formatted
-    assert "[Source: terms.pdf | Page: 5]" in formatted
+    assert "Source: terms.pdf" in formatted
+    assert "Page: 5" in formatted
 
 
 @patch("src.rag.vector_store.QdrantClient")
