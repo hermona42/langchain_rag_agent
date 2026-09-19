@@ -1,6 +1,7 @@
 from typing import List
 from langchain_core.documents import Document
-from langchain_community.embeddings import FakeEmbeddings
+from langchain_core.embeddings.fake import FakeEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams
@@ -10,22 +11,22 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+
 class QdrantRAGStore:
     def __init__(self, collection_name: str = "knowledge_base", in_memory: bool = False):
         self.settings = get_settings()
         self.collection_name = collection_name
-        
+
         api_key = self.settings.OPENAI_API_KEY.strip()
-        
-        # Use FakeEmbeddings if API key is missing or dummy for offline execution
+
+        # Fall back to FakeEmbeddings if API key is missing or dummy
         if not api_key or api_key.startswith("dummy") or api_key == "your_openai_api_key_here":
             logger.info("Using FakeEmbeddings for zero-cost offline vector indexing")
             self.embeddings = FakeEmbeddings(size=1536)
         else:
-            from langchain_openai import OpenAIEmbeddings
             self.embeddings = OpenAIEmbeddings(
                 model=self.settings.EMBEDDING_MODEL,
-                openai_api_key=api_key
+                openai_api_key=api_key,
             )
 
         if in_memory:
